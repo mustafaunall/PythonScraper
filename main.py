@@ -1,3 +1,4 @@
+import sys
 import requests
 from bs4 import BeautifulSoup
 from time import sleep
@@ -6,7 +7,13 @@ from xlutils.copy import copy
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import NoSuchElementException
+from flask import Flask, jsonify
+from flask_cors import CORS
 
+sys.setrecursionlimit(999999999)
+app = Flask(__name__)
+cors = CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 excel_path = './dist/datas.xls'
 webdriverLocation = './dist/chromedriver.exe'
 
@@ -39,6 +46,8 @@ def getSiteUrl(sitename):
 def getResultFromFreshWorld(product):
 	options = webdriver.ChromeOptions()
 	options.add_argument('--start-maximized')
+	#options.add_argument('--headless')
+	#options.add_argument('--disable-gpu')
 	driver = webdriver.Chrome(options=options, executable_path=webdriverLocation)
 	driver.get(getSiteUrl('freshworld'))
 	sleep(1)
@@ -241,20 +250,20 @@ def getResultFromSebzeMeyveDunyasi(product):
 	return products
 
 def getProductFromAllSites(products):
-	result = {}
+	result = []
 	for product in products:
-		_arr = {}
+		_arr = []
 		freshworld = getResultFromFreshWorld(product)
 		if freshworld is not None:
-			_arr['freshworld'] = freshworld
+			_arr.append({"siteName": "freshworld", "values": freshworld})
 		else:
-			_arr['freshworld'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "freshworld", "values": {'error': 'Stokta bulunamadı!'}})
 
 		tazedirekt = getResultFromTazeDirekt(product)
 		if tazedirekt is not None:
-			_arr['tazedirekt'] = tazedirekt
+			_arr.append({"siteName": "tazedirekt", "values": tazedirekt})
 		else:
-			_arr['tazedirekt'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "tazedirekt", "values": {'error': 'Stokta bulunamadı!'}})
 
 		"""
 		misbahcem = getResultFromMisBahcem(product)
@@ -266,31 +275,32 @@ def getProductFromAllSites(products):
 
 		tazemasa = getResultFromTazeMasa(product)
 		if tazemasa is not None:
-			_arr['tazemasa'] = tazemasa
+			_arr.append({"siteName": "tazemasa", "values": tazemasa})
 		else:
-			_arr['tazemasa'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "tazemasa", "values": {'error': 'Stokta bulunamadı!'}})
 
 		hasanbey = getResultFromHasanbey(product)
 		if hasanbey is not None:
-			_arr['hasanbey'] = hasanbey
+			_arr.append({"siteName": "hasanbey", "values": hasanbey})
 		else:
-			_arr['hasanbey'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "hasanbey", "values": {'error': 'Stokta bulunamadı!'}})
 
 		greenada = getResultFromGreenada(product)
 		if greenada is not None:
-			_arr['greenada'] = greenada
+			_arr.append({"siteName": "greenada", "values": greenada})
 		else:
-			_arr['greenada'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "greenada", "values": {'error': 'Stokta bulunamadı!'}})
 
 		sebzemeyvedunyasi = getResultFromSebzeMeyveDunyasi(product)
 		if sebzemeyvedunyasi is not None:
-			_arr['sebzemeyvedunyasi'] = sebzemeyvedunyasi
+			_arr.append({"siteName": "sebzemeyvedunyasi", "values": sebzemeyvedunyasi})
 		else:
-			_arr['sebzemeyvedunyasi'] = {'error': 'Stokta bulunamadı!'}
+			_arr.append({"siteName": "sebzemeyvedunyasi", "values": {'error': 'Stokta bulunamadı!'}})
 
-		result[product] = _arr
+		result.append({"productName": product, "values": _arr})
 	print(result)
 	return result
+
 
 def writeToExcel(x, y, content):
 	try:
@@ -303,7 +313,18 @@ def writeToExcel(x, y, content):
 	except:
 		return False
 
-if __name__ == '__main__':
+
+@app.route('/getProductNames')
+def ProductNames():
 	products = getProductNames()
-	#getProductFromAllSites(products)
-	print(writeToExcel(0, 0, 'Deneme'))
+	return jsonify(products)
+
+
+@app.route('/getProductData/<product>')
+def ProductData(product):
+	data = getProductFromAllSites([product])
+	return jsonify(data)
+
+
+if __name__ == '__main__':
+	app.run('0.0.0.0', 5000, debug=True)
